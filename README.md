@@ -1,76 +1,77 @@
 # PeekTemp
 
-Компактный виджет для панели задач Windows 11. Показывает температуру и загрузку процессора и видеокарты:
+A compact widget for the Windows 11 taskbar. It shows CPU and GPU temperature and load:
 
 ```
 CPU  52°  12%
 GPU  61°  95%
 ```
 
-Виджет встроен прямо в панель задач, в трей он не попадает. Вместе с панелью он переезжает, прячется при автоскрытии и пропадает в полноэкранных играх.
+The widget is embedded directly in the taskbar, not in the tray. It moves with the taskbar, hides when the taskbar auto-hides, and disappears in fullscreen games.
 
-## Управление
+## Controls
 
-| Действие | Что делает |
+| Action | What it does |
 |---|---|
-| Клик | панель с подробностями: мощность, видеопамять и графики за последние 2 минуты |
-| Правый клик | меню настроек |
-| Перетаскивание | сдвигает виджет вдоль панели задач, положение запоминается |
+| Click | details panel: power, video memory and graphs for the last 2 minutes |
+| Right-click | settings menu |
+| Drag | moves the widget along the taskbar; the position is remembered |
 
-В меню есть:
-- вид: две строки или одна, фон, подсветка температуры жёлтым и красным, °C или °F;
-- положение: у трея или у левого края;
-- частота обновления;
-- выбор видеокарты (по умолчанию берётся дискретная);
-- язык интерфейса: как в системе, русский или английский;
-- автозапуск.
+The menu has:
+- view: two rows or one, background, yellow/red temperature highlighting, °C or °F;
+- position: next to the tray or at the left edge;
+- refresh rate;
+- graphics card selection (the discrete GPU is picked by default);
+- interface language: system default, Russian or English;
+- start with Windows.
 
-## Температура процессора
+## CPU temperature
 
-Температуру и загрузку видеокарты, а также загрузку процессора приложение читает без каких-либо условий. Для **температуры процессора** нужны драйвер [PawnIO](https://pawnio.eu/) и права администратора: датчики Ryzen и Core доступны только из режима ядра.
+GPU temperature and load, as well as CPU load, are read with no extra requirements. **CPU temperature** needs the [PawnIO](https://pawnio.eu/) driver and administrator rights: Ryzen and Core sensors are only accessible from kernel mode.
 
-1. Меню → «Установить драйвер PawnIO…». Запускается `winget install --id namazso.PawnIO -e`, установщик попросит подтверждение UAC.
-2. Меню → «Запускать при входе в Windows». Создаётся задача Планировщика с наивысшими правами: при входе в систему виджет стартует от администратора без запроса UAC.
-3. Если задача есть, ручной запуск `PeekTemp.exe` тоже идёт через неё, без UAC. Если задачи нет, а PawnIO установлен, приложение запросит права администратора. Отключается параметром `"AutoElevate": false` в настройках.
+1. Menu → "Install PawnIO driver…". This runs `winget install --id namazso.PawnIO -e`; the installer asks for UAC confirmation.
+2. Menu → "Start with Windows". This creates a Task Scheduler task with highest privileges, so at sign-in the widget starts as administrator without a UAC prompt.
+3. When the task exists, launching `PeekTemp.exe` manually also goes through it, without UAC. If there is no task but PawnIO is installed, the app asks for administrator rights. Turn this off with `"AutoElevate": false` in the settings.
 
-Если температура недоступна, вместо числа стоит «—», а причина написана в меню и в панели подробностей.
+If the temperature is unavailable, the widget shows "—" instead of a number, and the reason is shown in the menu and in the details panel.
 
-## Настройки
+## Settings
 
-Файл `%APPDATA%\PeekTemp\settings.json` (меню → «Открыть файл настроек»). Изменения подхватываются на лету. Пороги подсветки задаются в °C:
+File: `%APPDATA%\PeekTemp\settings.json` (menu → "Open settings file"). Changes are picked up on the fly. Highlight thresholds are in °C:
 
 ```json
 "CpuWarm": 80, "CpuHot": 90,
 "GpuWarm": 75, "GpuHot": 85
 ```
 
-Лог: `%LOCALAPPDATA%\PeekTemp\peektemp.log`.
+Log: `%LOCALAPPDATA%\PeekTemp\peektemp.log`.
 
-## Сборка
+## Building
 
-Нужен .NET SDK 9.
+Requires the .NET 9 SDK.
 
 ```bash
 dotnet build src/PeekTemp/PeekTemp.csproj
 ```
 
-Один исполняемый файл в `publish\PeekTemp.exe` (на целевом ПК нужен .NET 9 Desktop Runtime):
+A single executable in `publish\PeekTemp.exe` (the target PC needs the .NET 9 Desktop Runtime):
 
 ```bash
 powershell -File build.ps1
 ```
 
-Для отладки: `PeekTemp.exe --preview <папка>` около 10 секунд снимает реальные показания и рисует все варианты виджета и панели в PNG, не трогая панель задач. `--no-elevate` запускает без запроса прав администратора.
+For debugging: `PeekTemp.exe --preview <folder>` takes real readings for about 10 seconds and renders every widget and panel variant to PNG without touching the taskbar (add `--english` for English text). `--no-elevate` starts without asking for administrator rights.
 
-## Как это устроено
+## How it works
 
-- `UI/TaskbarWidget.cs`: окно-потомок `Shell_TrayWnd` с попиксельной прозрачностью (`WS_EX_LAYERED` + `UpdateLayeredWindow`). Позиция привязана к левому краю `TrayNotifyWnd` (или к левому краю панели) со смещением, которое задаётся перетаскиванием.
-- `App.cs`: скрытое окно-хозяин и цикл сообщений. Ловит `TaskbarCreated` (перезапуск Explorer), смену темы и DPI, раз в секунду проверяет, что виджет на месте.
-- `Sensors/`: опрос [LibreHardwareMonitorLib](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor) в фоновом потоке. Библиотека работает через PawnIO, а не через WinRing0, который блокирует Defender.
-- Рисование через GDI+ в DIB-секцию, меню нативные Win32, поэтому выглядят как в Windows 11 и поддерживают тёмную тему.
+- `UI/TaskbarWidget.cs`: a child window of `Shell_TrayWnd` with per-pixel alpha (`WS_EX_LAYERED` + `UpdateLayeredWindow`). Its position is anchored to the left edge of `TrayNotifyWnd` (or to the left edge of the taskbar) plus an offset set by dragging.
+- `App.cs`: a hidden host window and the message loop. It handles `TaskbarCreated` (Explorer restart), theme and DPI changes, and checks every second that the widget is still in place.
+- `Sensors/`: polls [LibreHardwareMonitorLib](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor) on a background thread. The library uses PawnIO rather than WinRing0, which Defender blocks.
+- `Strings.cs`: Russian and English UI strings.
+- Drawing is GDI+ into a DIB section; menus are native Win32, so they look like Windows 11 and support dark mode.
 
-## Ограничения
+## Limitations
 
-- Виджет показывается только на панели задач основного монитора.
-- Explorer не знает о виджете. Если открыто очень много окон, их кнопки могут уйти под виджет. В этом случае его можно перетащить или переключить на одну строку.
-- Встраивание опирается на внутреннее устройство панели задач Windows 11 (`Shell_TrayWnd`, `TrayNotifyWnd`). Крупное обновление Windows может это сломать.
+- The widget appears only on the primary monitor's taskbar.
+- Explorer doesn't know about the widget. With a lot of open windows, their buttons can slide under it; drag the widget away or switch to one row.
+- Embedding relies on Windows 11 taskbar internals (`Shell_TrayWnd`, `TrayNotifyWnd`). A major Windows update could break it.
