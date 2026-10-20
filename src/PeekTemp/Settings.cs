@@ -19,7 +19,7 @@ internal sealed class Settings
     public bool ShowBackground { get; set; } = true;
     public bool ColorizeTemperature { get; set; } = true;
     public bool Fahrenheit { get; set; }
-    public int UpdateIntervalMs { get; set; } = 1000;
+    public int UpdateIntervalMs { get; set; } = 2000;
 
     /// <summary>Which taskbar edge the widget is attached to.</summary>
     public WidgetAnchor Anchor { get; set; } = WidgetAnchor.Tray;

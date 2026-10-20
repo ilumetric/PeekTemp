@@ -71,7 +71,7 @@ internal sealed class SensorService : IDisposable
     private volatile bool _pawnIoInstalled;
     private DateTime _pawnIoCheckedAt;
 
-    private volatile int _intervalMs = 1000;
+    private volatile int _intervalMs = 2000;
     private volatile string? _preferredGpu;
     private bool? _hadCpuTemp;
 
