@@ -34,7 +34,7 @@ internal sealed class SensorFrame
 internal sealed record SensorSnapshot(
     float? CpuTemp, float? CpuLoad, float? CpuPower, string? CpuName,
     float? GpuTemp, float? GpuLoad, float? GpuPower, float? GpuMemUsedMb, float? GpuMemTotalMb, string? GpuName,
-    string Source, string? CpuTempIssue)
+    string Source, CpuTempIssue? CpuTempIssue)
 {
     public static readonly SensorSnapshot Empty =
         new(null, null, null, null, null, null, null, null, null, null, "", null);

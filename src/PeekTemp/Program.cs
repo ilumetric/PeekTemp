@@ -23,7 +23,9 @@ internal static class Program
         if (preview >= 0)
         {
             var dir = preview + 1 < args.Length ? args[preview + 1] : Path.Combine(AppContext.BaseDirectory, "preview");
-            using var previewApp = new App(new Settings());
+            var previewSettings = new Settings();
+            if (args.Contains("--english")) previewSettings.Language = Language.English;
+            using var previewApp = new App(previewSettings);
             previewApp.RenderPreview(dir);
             return 0;
         }

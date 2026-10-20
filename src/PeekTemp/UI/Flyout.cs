@@ -138,8 +138,8 @@ internal sealed class Flyout : WindowBase, IDisposable
 
             float x = body.X + pad;
             float y = body.Y + pad;
-            y = DrawSection(g, x, y, innerW, "Процессор", snap.CpuName, snap.CpuTemp, snap.CpuLoad,
-                new[] { ("Мощность", Format.Watts(snap.CpuPower)) },
+            y = DrawSection(g, x, y, innerW, Strings.Processor, snap.CpuName, snap.CpuTemp, snap.CpuLoad,
+                new[] { (Strings.Power, Format.Watts(snap.CpuPower)) },
                 _app.Sensors.CpuTemp, _app.Sensors.CpuLoad, s.CpuWarm, s.CpuHot);
 
             y += D(14);
@@ -147,8 +147,8 @@ internal sealed class Flyout : WindowBase, IDisposable
                 g.DrawLine(pen, body.X + 1, (float)Math.Round(y) + 0.5f, body.Right - 1, (float)Math.Round(y) + 0.5f);
             y += D(15);
 
-            y = DrawSection(g, x, y, innerW, "Видеокарта", snap.GpuName, snap.GpuTemp, snap.GpuLoad,
-                new[] { ("Мощность", Format.Watts(snap.GpuPower)), ("Память", Format.Memory(snap.GpuMemUsedMb, snap.GpuMemTotalMb)) },
+            y = DrawSection(g, x, y, innerW, Strings.GraphicsCard, snap.GpuName, snap.GpuTemp, snap.GpuLoad,
+                new[] { (Strings.Power, Format.Watts(snap.GpuPower)), (Strings.Memory, Format.Memory(snap.GpuMemUsedMb, snap.GpuMemTotalMb)) },
                 _app.Sensors.GpuTemp, _app.Sensors.GpuLoad, s.GpuWarm, s.GpuHot);
 
             y += D(14);
@@ -219,7 +219,7 @@ internal sealed class Flyout : WindowBase, IDisposable
         y += D(17) + D(10);
 
         // Big temperature on the left, stats on the right.
-        var stats = new List<(string, string)> { ("Загрузка", Format.Percent(load)) };
+        var stats = new List<(string, string)> { (Strings.Load, Format.Percent(load)) };
         stats.AddRange(extra);
         float rowH = Math.Max(D(44), stats.Count * D(19));
         var tempColor = temp == null ? t.TextTertiary : t.TemperatureColor(temp, warm, hot, s.ColorizeTemperature);
@@ -245,11 +245,13 @@ internal sealed class Flyout : WindowBase, IDisposable
 
         // Legend
         float lx = x;
-        lx = DrawLegend(g, lx, y, t.GraphTemp, "Температура");
-        DrawLegend(g, lx + D(14), y, t.GraphLoad, "Загрузка");
+        lx = DrawLegend(g, lx, y, t.GraphTemp, Strings.Temperature);
+        DrawLegend(g, lx + D(14), y, t.GraphLoad, Strings.Load);
         var span = TimeSpan.FromMilliseconds((double)SensorService.HistoryLength * _app.Settings.UpdateIntervalMs);
-        var spanText = span.TotalMinutes >= 1 ? $"{span.TotalMinutes:0.#} мин" : $"{span.TotalSeconds:0} с";
-        g.DrawString(spanText.Replace('.', ','), _small!, tertiary, new RectangleF(x, y - D(2), w, D(16)), farFmt);
+        var spanText = span.TotalMinutes >= 1
+            ? span.TotalMinutes.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " " + Strings.Minutes
+            : span.TotalSeconds.ToString("0", System.Globalization.CultureInfo.InvariantCulture) + " " + Strings.Seconds;
+        g.DrawString(spanText.Replace('.', Strings.DecimalSeparator), _small!, tertiary, new RectangleF(x, y - D(2), w, D(16)), farFmt);
         return y + D(14);
     }
 
@@ -344,11 +346,11 @@ internal sealed class Flyout : WindowBase, IDisposable
     private string BuildFooter(SensorSnapshot snap)
     {
         var lines = new List<string>();
-        if (snap.CpuTempIssue != null)
-            lines.Add("Температура CPU недоступна. " + snap.CpuTempIssue + ".");
-        var source = string.IsNullOrEmpty(snap.Source) ? "нет данных" : snap.Source;
-        lines.Add($"Источник: {source}" + (Elevation.IsElevated ? " · администратор" : ""));
-        lines.Add("Правый клик — настройки. Виджет можно перетащить мышью.");
+        if (snap.CpuTempIssue is { } issue)
+            lines.Add(Strings.CpuTempUnavailable + Strings.Issue(issue) + ".");
+        var source = string.IsNullOrEmpty(snap.Source) ? Strings.NoData : snap.Source;
+        lines.Add(Strings.Source + source + (Elevation.IsElevated ? Strings.Administrator : ""));
+        lines.Add(Strings.FlyoutHint);
         return string.Join("\n", lines);
     }
 

@@ -27,6 +27,7 @@ internal sealed class App : WindowBase, IDisposable
     public App(Settings settings)
     {
         Settings = settings;
+        Strings.Apply(settings.Language);
         _sensors = new SensorService(OnSensorsUpdated)
         {
             IntervalMs = settings.UpdateIntervalMs,
@@ -166,6 +167,7 @@ internal sealed class App : WindowBase, IDisposable
     {
         _sensors.IntervalMs = Settings.UpdateIntervalMs;
         _sensors.PreferredGpu = Settings.Gpu;
+        Strings.Apply(Settings.Language);
         _widget.UpdateLayout(force: true);
         _flyout.Refresh();
     }
@@ -201,54 +203,59 @@ internal sealed class App : WindowBase, IDisposable
 
         menu.Label("CPU: " + (snap.CpuName ?? "—"));
         menu.Label("GPU: " + (snap.GpuName ?? "—"));
-        if (snap.CpuTempIssue != null)
-            menu.Label("Темп. CPU недоступна: " + snap.CpuTempIssue);
+        if (snap.CpuTempIssue is { } issue)
+            menu.Label(Strings.CpuTempUnavailableShort + Strings.Issue(issue));
         menu.Separator();
 
-        menu.Item("Подробнее", ShowFlyout);
+        menu.Item(Strings.Details, ShowFlyout);
 
-        var view = menu.Sub("Вид");
-        view.Item("Две строки", () => Change(x => x.Layout = WidgetLayout.TwoRows), s.Layout == WidgetLayout.TwoRows);
-        view.Item("Одна строка", () => Change(x => x.Layout = WidgetLayout.OneRow), s.Layout == WidgetLayout.OneRow);
+        var view = menu.Sub(Strings.View);
+        view.Item(Strings.TwoRows, () => Change(x => x.Layout = WidgetLayout.TwoRows), s.Layout == WidgetLayout.TwoRows);
+        view.Item(Strings.OneRow, () => Change(x => x.Layout = WidgetLayout.OneRow), s.Layout == WidgetLayout.OneRow);
         view.Separator();
-        view.Item("Фон", () => Change(x => x.ShowBackground = !x.ShowBackground), s.ShowBackground);
-        view.Item("Цвет по температуре", () => Change(x => x.ColorizeTemperature = !x.ColorizeTemperature), s.ColorizeTemperature);
+        view.Item(Strings.Background, () => Change(x => x.ShowBackground = !x.ShowBackground), s.ShowBackground);
+        view.Item(Strings.ColorByTemperature, () => Change(x => x.ColorizeTemperature = !x.ColorizeTemperature), s.ColorizeTemperature);
         view.Separator();
-        view.Item("Градусы Цельсия (°C)", () => Change(x => x.Fahrenheit = false), !s.Fahrenheit);
-        view.Item("Градусы Фаренгейта (°F)", () => Change(x => x.Fahrenheit = true), s.Fahrenheit);
+        view.Item(Strings.Celsius, () => Change(x => x.Fahrenheit = false), !s.Fahrenheit);
+        view.Item(Strings.Fahrenheit, () => Change(x => x.Fahrenheit = true), s.Fahrenheit);
 
-        var position = menu.Sub("Положение");
-        position.Item("У трея (справа)", () => Change(x => { x.Anchor = WidgetAnchor.Tray; x.Offset = 0; }),
+        var position = menu.Sub(Strings.Position);
+        position.Item(Strings.NearTray, () => Change(x => { x.Anchor = WidgetAnchor.Tray; x.Offset = 0; }),
             s.Anchor == WidgetAnchor.Tray);
-        position.Item("У левого края", () => Change(x => { x.Anchor = WidgetAnchor.Left; x.Offset = 0; }),
+        position.Item(Strings.LeftEdge, () => Change(x => { x.Anchor = WidgetAnchor.Left; x.Offset = 0; }),
             s.Anchor == WidgetAnchor.Left);
         position.Separator();
-        position.Item("Сбросить смещение", () => Change(x => x.Offset = 0), enabled: Math.Abs(s.Offset) > 0.01);
-        position.Label("Виджет можно перетащить мышью");
+        position.Item(Strings.ResetOffset, () => Change(x => x.Offset = 0), enabled: Math.Abs(s.Offset) > 0.01);
+        position.Label(Strings.DragHint);
 
-        var interval = menu.Sub("Обновление");
-        foreach (var (ms, label) in new[] { (500, "Каждые 0,5 с"), (1000, "Каждую секунду"), (2000, "Каждые 2 с"), (5000, "Каждые 5 с") })
+        var interval = menu.Sub(Strings.Refresh);
+        foreach (var (ms, label) in new[] { (500, Strings.Every05s), (1000, Strings.Every1s), (2000, Strings.Every2s), (5000, Strings.Every5s) })
             interval.Item(label, () => Change(x => x.UpdateIntervalMs = ms), s.UpdateIntervalMs == ms);
 
         var gpus = _sensors.GpuNames;
         if (gpus.Count > 1 || s.Gpu != null)
         {
-            var gpu = menu.Sub("Видеокарта");
-            gpu.Item("Автоматически (дискретная)", () => Change(x => x.Gpu = null), s.Gpu == null);
+            var gpu = menu.Sub(Strings.Gpu);
+            gpu.Item(Strings.GpuAuto, () => Change(x => x.Gpu = null), s.Gpu == null);
             foreach (var name in gpus)
                 gpu.Item(name, () => Change(x => x.Gpu = name), string.Equals(s.Gpu, name, StringComparison.OrdinalIgnoreCase));
         }
 
-        menu.Separator();
-        menu.Item("Запускать при входе в Windows", ToggleAutostart, Autostart.IsEnabled);
-        if (!Elevation.IsElevated)
-            menu.Item("Перезапустить от имени администратора", RestartElevated);
-        if (!_sensors.PawnIoInstalled)
-            menu.Item("Установить драйвер PawnIO (для температуры CPU)…", InstallPawnIo);
-        menu.Item("Открыть файл настроек", OpenSettingsFile);
+        var language = menu.Sub(Strings.LanguageMenu);
+        language.Item(Strings.LanguageSystem, () => Change(x => x.Language = Language.System), s.Language == Language.System);
+        language.Item("Русский", () => Change(x => x.Language = Language.Russian), s.Language == Language.Russian);
+        language.Item("English", () => Change(x => x.Language = Language.English), s.Language == Language.English);
 
         menu.Separator();
-        menu.Item("Выход", Quit);
+        menu.Item(Strings.StartWithWindows, ToggleAutostart, Autostart.IsEnabled);
+        if (!Elevation.IsElevated)
+            menu.Item(Strings.RestartAsAdmin, RestartElevated);
+        if (!_sensors.PawnIoInstalled)
+            menu.Item(Strings.InstallPawnIo, InstallPawnIo);
+        menu.Item(Strings.OpenSettings, OpenSettingsFile);
+
+        menu.Separator();
+        menu.Item(Strings.Exit, Quit);
 
         _flyout.Hide();
         menu.Show(Handle, pt);
@@ -277,8 +284,7 @@ internal sealed class App : WindowBase, IDisposable
         {
             // A visible console, so the user sees winget's progress and its own prompts.
             Process.Start(new ProcessStartInfo("cmd.exe",
-                "/k echo Установка драйвера PawnIO через winget... & winget install --id namazso.PawnIO -e & " +
-                "echo. & echo Готово. Перезапустите PeekTemp от имени администратора.")
+                $"/k echo {Strings.PawnIoInstalling} & winget install --id namazso.PawnIO -e & echo. & echo {Strings.PawnIoDone}")
             {
                 UseShellExecute = true,
             });

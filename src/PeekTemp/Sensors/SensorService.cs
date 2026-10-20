@@ -164,13 +164,11 @@ internal sealed class SensorService : IDisposable
         GpuLoad.Add(frame.GpuLoad);
     }
 
-    private string DiagnoseCpuTemp()
+    private CpuTempIssue DiagnoseCpuTemp()
     {
-        if (!_pawnIoInstalled)
-            return "Нужен драйвер PawnIO и права администратора";
-        if (!Elevation.IsElevated)
-            return "Нужны права администратора";
-        return "Датчик температуры CPU не найден";
+        if (!_pawnIoInstalled) return CpuTempIssue.NoDriver;
+        if (!Elevation.IsElevated) return CpuTempIssue.NotElevated;
+        return CpuTempIssue.SensorNotFound;
     }
 
     public void Dispose()

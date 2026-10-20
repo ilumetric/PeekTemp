@@ -30,6 +30,8 @@ internal sealed class Settings
     /// <summary>Preferred GPU name; null picks the discrete GPU automatically.</summary>
     public string? Gpu { get; set; }
 
+    public Language Language { get; set; } = Language.System;
+
     /// <summary>On manual start, ask for admin rights when PawnIO is installed (needed for CPU temperature).</summary>
     public bool AutoElevate { get; set; } = true;
 

@@ -14,14 +14,14 @@ internal static class Format
         value is { } v ? Math.Round(Math.Clamp(v, 0, 100)).ToString("0", Inv) + "%" : Missing;
 
     public static string Watts(float? value) =>
-        value is { } v ? Math.Round(v).ToString("0", Inv) + " Вт" : Missing;
+        value is { } v ? Math.Round(v).ToString("0", Inv) + " " + Strings.Watt : Missing;
 
     public static string Memory(float? usedMb, float? totalMb)
     {
         if (usedMb is not { } used) return Missing;
-        var usedGb = (used / 1024).ToString("0.0", Inv).Replace('.', ',');
-        if (totalMb is not { } total || total <= 0) return usedGb + " ГБ";
-        var totalGb = (total / 1024).ToString(total >= 10 * 1024 ? "0" : "0.#", Inv).Replace('.', ',');
-        return $"{usedGb} / {totalGb} ГБ";
+        var usedGb = (used / 1024).ToString("0.0", Inv).Replace('.', Strings.DecimalSeparator);
+        if (totalMb is not { } total || total <= 0) return usedGb + " " + Strings.Gigabyte;
+        var totalGb = (total / 1024).ToString(total >= 10 * 1024 ? "0" : "0.#", Inv).Replace('.', Strings.DecimalSeparator);
+        return $"{usedGb} / {totalGb} {Strings.Gigabyte}";
     }
 }
