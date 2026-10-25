@@ -14,7 +14,7 @@
     <ApplicationIcon>Assets\PeekTemp.ico</ApplicationIcon>
     <AssemblyName>PeekTemp</AssemblyName>
     <RootNamespace>PeekTemp</RootNamespace>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <Product>PeekTemp</Product>
     <Description>CPU/GPU temperature and load widget for the Windows 11 taskbar</Description>
     <Copyright>ilumetric</Copyright>
