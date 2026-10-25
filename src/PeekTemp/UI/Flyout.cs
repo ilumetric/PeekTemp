@@ -16,6 +16,7 @@ internal sealed class Flyout : WindowBase, IDisposable
     private const float ShadowDip = 16;
     private const float RadiusDip = 8;
     private const float GraphHeightDip = 46;
+    private const float AppRowDip = 20;
 
     private readonly App _app;
     private readonly LayeredSurface _surface = new();
@@ -27,6 +28,7 @@ internal sealed class Flyout : WindowBase, IDisposable
     private float _fontScale = -1;
     private Font? _title, _body, _bodyStrong, _small, _big;
     private DateTime _hiddenAt;
+    private readonly Dictionary<string, Bitmap?> _icons = new(StringComparer.OrdinalIgnoreCase);
 
     public Flyout(App app) => _app = app;
 
@@ -55,6 +57,8 @@ internal sealed class Flyout : WindowBase, IDisposable
         _taskbarRect = taskbarRect;
         _scale = scale;
         Visible = true;
+        _app.Sensors.Processes.Active = true;
+        _app.Sensors.Wake();
         Render();
         SetWindowPos(Handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
         SetForegroundWindow(Handle);
@@ -64,7 +68,9 @@ internal sealed class Flyout : WindowBase, IDisposable
     {
         if (!Visible) return;
         Visible = false;
+        _app.Sensors.Processes.Active = false;
         _hiddenAt = DateTime.UtcNow;
+        ClearIcons();
         if (IsAlive) ShowWindow(Handle, SW_HIDE);
     }
 
@@ -98,6 +104,7 @@ internal sealed class Flyout : WindowBase, IDisposable
     {
         EnsureFonts();
         var snap = _app.Sensors.Current;
+        var processes = _app.Sensors.Processes;
         var s = _app.Settings;
         var t = _app.Theme;
 
@@ -141,6 +148,7 @@ internal sealed class Flyout : WindowBase, IDisposable
             y = DrawSection(g, x, y, innerW, Strings.Processor, snap.CpuName, snap.CpuTemp, snap.CpuLoad,
                 new[] { (Strings.Power, Format.Watts(snap.CpuPower)) },
                 _app.Sensors.CpuTemp, _app.Sensors.CpuLoad, s.CpuWarm, s.CpuHot);
+            y = DrawApps(g, x, y, innerW, processes.TopCpu, processes.Measured);
 
             y += D(14);
             using (var pen = new Pen(t.Divider, 1))
@@ -150,6 +158,7 @@ internal sealed class Flyout : WindowBase, IDisposable
             y = DrawSection(g, x, y, innerW, Strings.GraphicsCard, snap.GpuName, snap.GpuTemp, snap.GpuLoad,
                 new[] { (Strings.Power, Format.Watts(snap.GpuPower)), (Strings.Memory, Format.Memory(snap.GpuMemUsedMb, snap.GpuMemTotalMb)) },
                 _app.Sensors.GpuTemp, _app.Sensors.GpuLoad, s.GpuWarm, s.GpuHot);
+            y = DrawApps(g, x, y, innerW, processes.TopGpu, processes.Measured);
 
             y += D(14);
             using var brush = new SolidBrush(t.TextTertiary);
@@ -190,7 +199,95 @@ internal sealed class Flyout : WindowBase, IDisposable
     private float SectionHeight(bool isGpu)
     {
         int stats = isGpu ? 3 : 2;
-        return D(18) + D(17) + D(10) + Math.Max(D(44), stats * D(19)) + D(12) + D(GraphHeightDip) + D(6) + D(14);
+        return D(18) + D(17) + D(10) + Math.Max(D(44), stats * D(19)) + D(12) + D(GraphHeightDip) + D(6) + D(14)
+               + AppsHeight();
+    }
+
+    private float AppsHeight() => D(10) + D(17) + ProcessMonitor.TopCount * D(AppRowDip);
+
+    /// <summary>The applications that load this device the most: icon, name and share.</summary>
+    private float DrawApps(Graphics g, float x, float y, float w, IReadOnlyList<AppUsage> apps, bool measured)
+    {
+        var t = _app.Theme;
+        using var text = new SolidBrush(t.TextSecondary);
+        using var strong = new SolidBrush(t.Text);
+        using var tertiary = new SolidBrush(t.TextTertiary);
+        using var nearFmt = new StringFormat(StringFormat.GenericTypographic)
+        {
+            Trimming = StringTrimming.EllipsisCharacter,
+            FormatFlags = StringFormatFlags.NoWrap,
+            LineAlignment = StringAlignment.Center,
+        };
+        using var farFmt = new StringFormat(StringFormat.GenericTypographic)
+        {
+            Alignment = StringAlignment.Far,
+            FormatFlags = StringFormatFlags.NoWrap,
+            LineAlignment = StringAlignment.Center,
+        };
+
+        y += D(10);
+        g.DrawString(Strings.TopApps, _small!, tertiary, new RectangleF(x, y, w, D(17)), nearFmt);
+        y += D(17);
+
+        float rowH = D(AppRowDip);
+        if (apps.Count == 0)
+        {
+            g.DrawString(measured ? Strings.NoActiveApps : Strings.Measuring, _body!, tertiary,
+                new RectangleF(x, y, w, rowH), nearFmt);
+            return y + ProcessMonitor.TopCount * rowH;
+        }
+
+        float icon = D(16);
+        float percentW = D(44);
+        foreach (var app in apps)
+        {
+            var iconRect = new RectangleF(x, y + (rowH - icon) / 2, icon, icon);
+            if (Icon(app.Path) is { } bitmap)
+            {
+                var mode = g.InterpolationMode;
+                g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                g.DrawImage(bitmap, iconRect);
+                g.InterpolationMode = mode;
+            }
+            else
+            {
+                using var path = WidgetRenderer.RoundedRect(RectangleF.Inflate(iconRect, -D(1), -D(1)), D(3));
+                using var fill = new SolidBrush(t.Divider);
+                g.FillPath(fill, path);
+            }
+
+            float nameX = x + icon + D(8);
+            g.DrawString(app.Name, _body!, text, new RectangleF(nameX, y, w - (nameX - x) - percentW, rowH), nearFmt);
+            g.DrawString(Format.Percent(Math.Max(1, app.Percent)), _bodyStrong!, strong,
+                new RectangleF(x + w - percentW, y, percentW, rowH), farFmt);
+            y += rowH;
+        }
+        return y + (ProcessMonitor.TopCount - apps.Count) * rowH;
+    }
+
+    private Bitmap? Icon(string? path)
+    {
+        if (path == null) return null;
+        if (_icons.TryGetValue(path, out var cached)) return cached;
+        Bitmap? bitmap = null;
+        try
+        {
+            using var icon = System.Drawing.Icon.ExtractAssociatedIcon(path);
+            bitmap = icon?.ToBitmap();
+        }
+        catch (Exception ex)
+        {
+            Log.Throttled("icon", "Icon extraction failed: " + ex.Message);
+        }
+        if (_icons.Count > 256) ClearIcons();
+        _icons[path] = bitmap;
+        return bitmap;
+    }
+
+    private void ClearIcons()
+    {
+        foreach (var bitmap in _icons.Values) bitmap?.Dispose();
+        _icons.Clear();
     }
 
     private float DrawSection(Graphics g, float x, float y, float w, string title, string? name,
@@ -380,5 +477,6 @@ internal sealed class Flyout : WindowBase, IDisposable
         Destroy();
         _surface.Dispose();
         DisposeFonts();
+        ClearIcons();
     }
 }

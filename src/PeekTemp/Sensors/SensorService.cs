@@ -80,6 +80,9 @@ internal sealed class SensorService : IDisposable
     public History GpuTemp { get; } = new(HistoryLength);
     public History GpuLoad { get; } = new(HistoryLength);
 
+    /// <summary>Top CPU/GPU applications; sampled only while <see cref="ProcessMonitor.Active"/>.</summary>
+    public ProcessMonitor Processes { get; } = new();
+
     public SensorService(Action onUpdated)
     {
         _onUpdated = onUpdated;
@@ -106,6 +109,9 @@ internal sealed class SensorService : IDisposable
 
     public void Start() => _thread.Start();
 
+    /// <summary>Polls right away instead of waiting for the interval.</summary>
+    public void Wake() => _wake.Set();
+
     private void Run()
     {
         while (!_stop)
@@ -124,7 +130,9 @@ internal sealed class SensorService : IDisposable
             try { _onUpdated(); }
             catch (Exception ex) { Log.Throttled("notify", "Sensor notify failed: " + ex.Message); }
 
-            var wait = (int)Math.Max(50, _intervalMs - sw.ElapsedMilliseconds);
+            // The first process sample is only a baseline: take the second one soon after.
+            int interval = Processes.WantsFollowUp ? Math.Min(_intervalMs, 700) : _intervalMs;
+            var wait = (int)Math.Max(50, interval - sw.ElapsedMilliseconds);
             _wake.WaitOne(wait);
         }
     }
@@ -162,6 +170,15 @@ internal sealed class SensorService : IDisposable
         CpuLoad.Add(frame.CpuLoad);
         GpuTemp.Add(frame.GpuTemp);
         GpuLoad.Add(frame.GpuLoad);
+
+        try
+        {
+            Processes.Sample();
+        }
+        catch (Exception ex)
+        {
+            Log.Throttled("processes", "Process sample failed: " + ex);
+        }
     }
 
     private CpuTempIssue DiagnoseCpuTemp()
@@ -178,6 +195,7 @@ internal sealed class SensorService : IDisposable
         if (_thread.IsAlive && !_thread.Join(3000))
             Log.Info("Sensor thread did not stop in time");
         _lhm.Dispose();
+        Processes.Dispose();
         _wake.Dispose();
     }
 }

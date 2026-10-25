@@ -13,7 +13,7 @@ The widget is embedded directly in the taskbar, not in the tray. It moves with t
 
 | Action | What it does |
 |---|---|
-| Click | details panel: power, video memory and graphs for the last 4 minutes (120 samples) |
+| Click | details panel: power, video memory, graphs for the last 4 minutes (120 samples) and the three apps loading the CPU and the GPU the most (sampled only while the panel is open) |
 | Right-click | settings menu |
 | Drag | moves the widget along the taskbar; the position is remembered |
 

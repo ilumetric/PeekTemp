@@ -64,6 +64,9 @@ internal static class Strings
     public static string Power => T("Мощность", "Power");
     public static string Memory => T("Память", "Memory");
     public static string Temperature => T("Температура", "Temperature");
+    public static string TopApps => T("Больше всего нагружают", "Most demanding apps");
+    public static string Measuring => T("Подсчёт…", "Measuring…");
+    public static string NoActiveApps => T("Нет заметной нагрузки", "No noticeable load");
     public static string Minutes => T("мин", "min");
     public static string Seconds => T("с", "s");
     public static string Watt => T("Вт", "W");

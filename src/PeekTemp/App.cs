@@ -318,6 +318,7 @@ internal sealed class App : WindowBase, IDisposable
     {
         Directory.CreateDirectory(dir);
         _sensors.IntervalMs = 250;
+        _sensors.Processes.Active = true;
         _sensors.Start();
         Thread.Sleep(10_000);
 
